@@ -18,6 +18,22 @@ st.set_page_config(
     layout="wide",
 )
 
+# Estilos extra para tema oscuro (complementa .streamlit/config.toml base=dark)
+st.markdown("""
+<style>
+/* Mejora legibilidad de bloques de código en dark */
+pre, code, .stCode, .stMarkdown code {
+  background:#0f1b2d !important;
+  color:#e5e7eb !important;
+}
+/* Cabeceras de tablas/DF más contrastadas */
+[data-testid="stTable"] th, [data-testid="stDataFrame"] thead th {
+  background:#0f172a !important;
+  color:#e5e7eb !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 PRIMARY = "#0f766e"
 os.makedirs("entregas", exist_ok=True)
 os.makedirs("materiales", exist_ok=True)
@@ -354,7 +370,6 @@ with tabs[5]:
         ["Identidad", "Verificación presencial/administrativa", "Claves públicas; capas de identidad externa"],
         ["Oponibilidad", "Efectos legales frente a terceros", "Depende del reconocimiento normativo/gobernanza"],
     ], columns=cols)
-    # usa el editor moderno
     s2_edit = st.data_editor(s2_base, num_rows="dynamic", use_container_width=True)
 
     cL, cR = st.columns([1, 1])
@@ -365,6 +380,27 @@ with tabs[5]:
         st.caption("Rúbrica: precisión (40%), claridad (30%), aplicación (30%).")
 
     st.markdown("---")
+
+    # === NUEVO: Listado y descarga de entregas guardadas ===
+    st.markdown("#### Entregas guardadas")
+    if os.path.isdir("entregas"):
+        files = sorted([f for f in os.listdir("entregas") if f.endswith(".md")])
+        if files:
+            for idx, f in enumerate(files):
+                file_path = os.path.join("entregas", f)
+                with open(file_path, "r", encoding="utf-8") as fh:
+                    st.download_button(
+                        label=f"⬇️ Descargar {f}",
+                        data=fh.read(),
+                        file_name=f,
+                        mime="text/markdown",
+                        key=f"dl_{idx}_{f}"
+                    )
+        else:
+            st.caption("No hay entregas guardadas aún.")
+    else:
+        st.caption("La carpeta 'entregas' no existe.")
+
     st.markdown(
         """
 **Resultado de aprendizaje (UD1):** identificar funciones del Derecho que replica la tecnología (**RA1**),
@@ -372,3 +408,4 @@ evaluar herramientas básicas de privacidad/ciberseguridad (**RA2**), y aplicar 
 """
     )
     st.caption("Aviso: la pseudo-firma HMAC es docente; no equivale a firma electrónica cualificada.")
+
