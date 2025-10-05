@@ -1,7 +1,7 @@
 [theme]
-base="light"
-primaryColor="#0f766e"
-backgroundColor="#ffffff"
-secondaryBackgroundColor="#f6f9fb"
-textColor="#0b1221"
-font="sans serif"
+base = "dark"
+primaryColor = "#14b8a6"            # acentos (teal legible en dark)
+backgroundColor = "#0b1221"         # fondo principal (azul petróleo muy oscuro)
+secondaryBackgroundColor = "#111827"# contenedores/cards
+textColor = "#e5e7eb"               # texto gris muy claro
+font = "sans serif"
