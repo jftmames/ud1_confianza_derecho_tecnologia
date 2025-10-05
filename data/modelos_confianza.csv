@@ -1,0 +1,3 @@
+modelo,rol,garantia,mecanismos,riesgos,ejemplos
+TTP (Tercero de Confianza Público),"Notarías, Registro Civil, Encargados del Registro","Fe pública, presunción de veracidad","Identidad verificada de funcionarios, protocolos, libro-folio, sellos, copias auténticas","Error humano, corrupción, colas/costos, jurisdicción limitada","Registro Civil, Notariado, Registro de la Propiedad"
+Blockchain (registro distribuido),"Nodos, consenso, validadores, smart contracts","Integridad por hash, trazabilidad, inmutabilidad probabilística","Criptografía (hash, firmas), consenso, sellado de tiempo, réplica","Errores de clave privada, bugs de smart contracts, gobernanza, costos energéticos","Bitcoin, Ethereum, consorcios empresariales"
