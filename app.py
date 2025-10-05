@@ -4,6 +4,7 @@ import random
 import string
 import hmac
 import hashlib
+import zipfile
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -21,12 +22,10 @@ st.set_page_config(
 # Estilos extra para tema oscuro (complementa .streamlit/config.toml base=dark)
 st.markdown("""
 <style>
-/* Mejora legibilidad de bloques de código en dark */
 pre, code, .stCode, .stMarkdown code {
   background:#0f1b2d !important;
   color:#e5e7eb !important;
 }
-/* Cabeceras de tablas/DF más contrastadas */
 [data-testid="stTable"] th, [data-testid="stDataFrame"] thead th {
   background:#0f172a !important;
   color:#e5e7eb !important;
@@ -69,6 +68,36 @@ def download_csv_button(df: pd.DataFrame, label: str, filename: str):
     buf = io.StringIO()
     df.to_csv(buf, index=False)
     st.download_button(label, buf.getvalue(), file_name=filename, mime="text/csv")
+
+def _zip_folder_md(folder_path: str) -> io.BytesIO:
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for root, _, files in os.walk(folder_path):
+            for file in files:
+                if file.endswith(".md"):
+                    full_path = os.path.join(root, file)
+                    arcname = os.path.relpath(full_path, folder_path)
+                    zf.write(full_path, arcname=arcname)
+    mem.seek(0)
+    return mem
+
+def _list_md_files(folder: str):
+    if not os.path.isdir(folder):
+        return []
+    return sorted([f for f in os.listdir(folder) if f.endswith(".md")])
+
+def _delete_md_in_folder(folder: str) -> int:
+    if not os.path.isdir(folder):
+        return 0
+    count = 0
+    for f in os.listdir(folder):
+        if f.endswith(".md"):
+            try:
+                os.remove(os.path.join(folder, f))
+                count += 1
+            except Exception:
+                pass
+    return count
 
 # ---------------------------
 # Cargar datasets
@@ -230,6 +259,16 @@ with tabs[1]:
                 f.write("## Explicación (máx. 5 líneas)\n\n")
                 f.write((s1_entrega or "").strip() + "\n")
             st.success(f"Entrega guardada en {fname}")
+
+            # Descarga inmediata tras guardar
+            with open(fname, "r", encoding="utf-8") as fh:
+                st.download_button(
+                    "⬇️ Descargar ahora (S1)",
+                    data=fh.read(),
+                    file_name=os.path.basename(fname),
+                    mime="text/markdown",
+                    key=f"dl_now_{ts}"
+                )
     with colS1b:
         st.caption("Criterios: precisión técnica (40%), claridad (30%), conexión con custodia (30%).")
 
@@ -358,6 +397,14 @@ with tabs[4]:
 with tabs[5]:
     st.header("Entregables (Semana 1) y rúbrica")
 
+    # ——— Mensaje de explicación claro en la última página ———
+    st.info(
+        "ℹ️ **Dónde se guardan y cómo bajarlas**\n\n"
+        "Cuando pulsas **Guardar entrega**, el archivo se crea en el **servidor** dentro de `./entregas`. "
+        "Desde **esta última página** puedes **descargar cada entrega** o **todas en ZIP** al ordenador. "
+        "Si trabajas en un entorno efímero, te recomiendo **descargar** tras guardar."
+    )
+
     st.subheader("Entrega S1 — 5 líneas (hash y cadena de custodia)")
     s1_extra = st.text_area("(Opcional) Pegar explicación S1 aquí:", height=120)
 
@@ -370,7 +417,6 @@ with tabs[5]:
         ["Identidad", "Verificación presencial/administrativa", "Claves públicas; capas de identidad externa"],
         ["Oponibilidad", "Efectos legales frente a terceros", "Depende del reconocimiento normativo/gobernanza"],
     ], columns=cols)
-    # ancho nuevo con API moderna
     s2_edit = st.data_editor(s2_base, num_rows="dynamic", width="stretch")
 
     cL, cR = st.columns([1, 1])
@@ -383,24 +429,45 @@ with tabs[5]:
     st.markdown("---")
 
     # === Listado y descarga de entregas guardadas ===
-    st.markdown("#### Entregas guardadas")
-    if os.path.isdir("entregas"):
-        files = sorted([f for f in os.listdir("entregas") if f.endswith(".md")])
-        if files:
-            for idx, f in enumerate(files):
-                file_path = os.path.join("entregas", f)
-                with open(file_path, "r", encoding="utf-8") as fh:
-                    st.download_button(
-                        label=f"⬇️ Descargar {f}",
-                        data=fh.read(),
-                        file_name=f,
-                        mime="text/markdown",
-                        key=f"dl_{idx}_{f}"
-                    )
-        else:
-            st.caption("No hay entregas guardadas aún.")
+    st.markdown("#### Entregas guardadas (en el servidor)")
+    md_files = _list_md_files("entregas")
+    if md_files:
+        for idx, f in enumerate(md_files):
+            file_path = os.path.join("entregas", f)
+            with open(file_path, "r", encoding="utf-8") as fh:
+                st.download_button(
+                    label=f"⬇️ Descargar {f}",
+                    data=fh.read(),
+                    file_name=f,
+                    mime="text/markdown",
+                    key=f"dl_file_{idx}_{f}"
+                )
     else:
-        st.caption("La carpeta 'entregas' no existe.")
+        st.caption("No hay entregas guardadas aún.")
+
+    # === ZIP masivo ===
+    st.markdown("#### Exportación masiva")
+    if md_files:
+        memzip = _zip_folder_md("entregas")
+        st.download_button(
+            "⬇️ Descargar TODO (ZIP)",
+            data=memzip,
+            file_name="entregas_ud1.zip",
+            mime="application/zip",
+            key="zip_entregas_ud1"
+        )
+    else:
+        st.caption("No hay entregas .md para comprimir aún.")
+
+    # === Borrado tras descarga (con confirmación) ===
+    st.markdown("#### Borrado tras descarga")
+    confirm = st.checkbox("He descargado mis entregas y quiero borrarlas del servidor")
+    if st.button("🧹 Borrar todas las entregas (.md)", disabled=not confirm):
+        removed = _delete_md_in_folder("entregas")
+        if removed > 0:
+            st.success(f"Se borraron {removed} archivo(s) .md de la carpeta 'entregas'.")
+        else:
+            st.warning("No había archivos .md que borrar.")
 
     st.markdown(
         """
@@ -409,3 +476,4 @@ evaluar herramientas básicas de privacidad/ciberseguridad (**RA2**), y aplicar 
 """
     )
     st.caption("Aviso: la pseudo-firma HMAC es docente; no equivale a firma electrónica cualificada.")
+
