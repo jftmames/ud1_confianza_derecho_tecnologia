@@ -138,19 +138,18 @@ docs_df = load_docs_demo()
 modelos_df = load_modelos_confianza()
 
 # ---------------------------
-# Estado inicial S1 (clave del problema)
+# Estado para S1 (selector + texto)
 # ---------------------------
 if "s1_pick" not in st.session_state:
     st.session_state.s1_pick = int(docs_df["id"].iloc[0])
 
 def _load_selected_text_from_pick():
-    """Callback: al cambiar el ID seleccionado, actualiza el texto y 'altered'."""
+    """Callback: al cambiar el ID seleccionado, actualiza el texto base y el 'alterado'."""
     pick = st.session_state["s1_pick"]
     base_text = docs_df.loc[docs_df["id"] == pick, "texto"].values[0]
     st.session_state["s1_text"] = base_text
-    st.session_state["s1_altered"] = base_text  # resetea el alterado
+    st.session_state["s1_altered"] = base_text
 
-# Inicializar s1_text y s1_altered si no existen
 if "s1_text" not in st.session_state:
     _load_selected_text_from_pick()
 if "ledger" not in st.session_state:
@@ -223,15 +222,9 @@ with tabs[1]:
             index=index_pick,
             format_func=lambda x: f"ID {x}",
             key="s1_pick",
-            on_change=_load_selected_text_from_pick,  # ← actualiza texto al cambiar
+            on_change=_load_selected_text_from_pick,
         )
-
-        # El text_area toma el valor **desde session_state**, no desde 'value' fijo
-        st.text_area(
-            "Documento (editable):",
-            key="s1_text",
-            height=120,
-        )
+        st.text_area("Documento (editable):", key="s1_text", height=120)
 
         if st.button("🔁 Alterar 1 carácter", key="alter_btn"):
             st.session_state.s1_altered = alter_one_char(st.session_state.s1_text)
@@ -376,7 +369,7 @@ with tabs[3]:
     st.info("La tecnología replica muy bien integridad y trazabilidad; autenticidad y oponibilidad suelen requerir capa jurídica adicional.")
 
 # ---------------------------
-# 5) Lecturas guiadas
+# 5) Lecturas guiadas  (MODIFICADO: descarga inmediata + listado + ZIP)
 # ---------------------------
 with tabs[4]:
     st.header("Lecturas y guía de estudio")
@@ -396,7 +389,9 @@ with tabs[4]:
 - 2 funciones que dependen de la norma: identidad fuerte, oponibilidad frente a terceros.
 """
     )
-    if st.button("📄 Descargar guía de lectura (MD)"):
+
+    # Generar/guardar guía y ofrecer descarga inmediata
+    if st.button("📄 Generar y guardar guía de lectura (MD)"):
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         fname = f"materiales/UD1_lecturas_{ts}.md"
         content = """# Guía de lectura — UD1
@@ -414,12 +409,60 @@ with tabs[4]:
 - 3 funciones replicadas: integridad, trazabilidad, disponibilidad.
 - 2 dependientes: identidad fuerte, oponibilidad/efectos frente a terceros.
 """
+        os.makedirs("materiales", exist_ok=True)
         with open(fname, "w", encoding="utf-8") as f:
             f.write(content)
         st.success(f"Guía guardada en {fname}")
 
+        # Descarga inmediata
+        with open(fname, "r", encoding="utf-8") as fh:
+            st.download_button(
+                "⬇️ Descargar ahora (Guía UD1)",
+                data=fh.read(),
+                file_name=os.path.basename(fname),
+                mime="text/markdown",
+                key=f"dl_lect_{ts}"
+            )
+
+    st.markdown("---")
+    st.info(
+        "ℹ️ **Dónde está la guía:** se guarda en el **servidor** dentro de `./materiales`. "
+        "Aquí abajo puedes **descargar cualquier guía** ya generada o **todas en ZIP**."
+    )
+
+    # Materiales guardados (descarga por archivo)
+    st.markdown("#### Materiales guardados (en el servidor)")
+    mats = _list_md_files("materiales")
+    if mats:
+        for idx, f in enumerate(mats):
+            path = os.path.join("materiales", f)
+            with open(path, "r", encoding="utf-8") as fh:
+                st.download_button(
+                    label=f"⬇️ Descargar {f}",
+                    data=fh.read(),
+                    file_name=f,
+                    mime="text/markdown",
+                    key=f"dl_mat_{idx}_{f}"
+                )
+    else:
+        st.caption("No hay materiales .md generados aún.")
+
+    # ZIP masivo de materiales
+    st.markdown("#### Exportación masiva")
+    if mats:
+        memzip_mat = _zip_folder_md("materiales")
+        st.download_button(
+            "⬇️ Descargar TODO (ZIP)",
+            data=memzip_mat,
+            file_name="materiales_ud1.zip",
+            mime="application/zip",
+            key="zip_materiales_ud1"
+        )
+    else:
+        st.caption("No hay materiales .md para comprimir aún.")
+
 # ---------------------------
-# 6) Entregables y rúbrica
+# 6) Entregables y rúbrica (con explicación, descargas, ZIP y borrado)
 # ---------------------------
 with tabs[5]:
     st.header("Entregables (Semana 1) y rúbrica")
@@ -454,7 +497,7 @@ with tabs[5]:
 
     st.markdown("---")
 
-    # === Entregas guardadas ===
+    # Entregas guardadas
     st.markdown("#### Entregas guardadas (en el servidor)")
     md_files = _list_md_files("entregas")
     if md_files:
@@ -471,7 +514,7 @@ with tabs[5]:
     else:
         st.caption("No hay entregas guardadas aún.")
 
-    # === ZIP masivo ===
+    # ZIP masivo de entregas
     st.markdown("#### Exportación masiva")
     if md_files:
         memzip = _zip_folder_md("entregas")
@@ -485,7 +528,7 @@ with tabs[5]:
     else:
         st.caption("No hay entregas .md para comprimir aún.")
 
-    # === Borrado tras descarga (con confirmación) ===
+    # Borrado tras descarga (con confirmación)
     st.markdown("#### Borrado tras descarga")
     confirm = st.checkbox("He descargado mis entregas y quiero borrarlas del servidor")
     if st.button("🧹 Borrar todas las entregas (.md)", disabled=not confirm):
@@ -502,4 +545,5 @@ evaluar herramientas básicas de privacidad/ciberseguridad (**RA2**), y aplicar 
 """
     )
     st.caption("Aviso: la pseudo-firma HMAC es docente; no equivale a firma electrónica cualificada.")
+
 
