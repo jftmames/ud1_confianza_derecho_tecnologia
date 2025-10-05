@@ -208,7 +208,7 @@ with tabs[1]:
     block3["hash"] = sha256_hex(block3["contenido"] + "|" + block3["prev_hash"])
 
     chain_df = pd.DataFrame([block1, block2, block3])
-    st.dataframe(chain_df, use_container_width=True)
+    st.dataframe(chain_df, width="stretch")
 
     st.markdown("#### 2.4 Entrega S1 — Explica en 5 líneas")
     s1_entrega = st.text_area(
@@ -266,13 +266,13 @@ with tabs[2]:
     st.markdown("#### Mini-ledger (local, en memoria)")
     ledger_df = pd.DataFrame(st.session_state.ledger)
     if not ledger_df.empty:
-        st.dataframe(ledger_df, use_container_width=True, height=240)
+        st.dataframe(ledger_df, width="stretch", height=240)
         download_csv_button(ledger_df, "⬇️ Exportar ledger CSV", "ledger_ud1.csv")
     else:
         st.caption("Aún no hay entradas registradas.")
 
     st.markdown("#### Cuadro comparativo: confianza humana vs algorítmica")
-    st.dataframe(load_modelos_confianza(), use_container_width=True)
+    st.dataframe(load_modelos_confianza(), width="stretch")
 
 # ---------------------------
 # 4) Comparativa Registro Civil vs Ledger distribuido
@@ -306,7 +306,7 @@ with tabs[3]:
             "Tecnología (Ledger)": "Reglas de consenso y upgrades; gobernanza on/off-chain."
         },
     ])
-    st.dataframe(comp, use_container_width=True)
+    st.dataframe(comp, width="stretch")
     st.info("La tecnología replica muy bien integridad y trazabilidad; autenticidad y oponibilidad suelen requerir capa jurídica adicional.")
 
 # ---------------------------
@@ -370,7 +370,8 @@ with tabs[5]:
         ["Identidad", "Verificación presencial/administrativa", "Claves públicas; capas de identidad externa"],
         ["Oponibilidad", "Efectos legales frente a terceros", "Depende del reconocimiento normativo/gobernanza"],
     ], columns=cols)
-    s2_edit = st.data_editor(s2_base, num_rows="dynamic", use_container_width=True)
+    # ancho nuevo con API moderna
+    s2_edit = st.data_editor(s2_base, num_rows="dynamic", width="stretch")
 
     cL, cR = st.columns([1, 1])
     with cL:
@@ -381,7 +382,7 @@ with tabs[5]:
 
     st.markdown("---")
 
-    # === NUEVO: Listado y descarga de entregas guardadas ===
+    # === Listado y descarga de entregas guardadas ===
     st.markdown("#### Entregas guardadas")
     if os.path.isdir("entregas"):
         files = sorted([f for f in os.listdir("entregas") if f.endswith(".md")])
@@ -408,4 +409,3 @@ evaluar herramientas básicas de privacidad/ciberseguridad (**RA2**), y aplicar 
 """
     )
     st.caption("Aviso: la pseudo-firma HMAC es docente; no equivale a firma electrónica cualificada.")
-
