@@ -110,10 +110,11 @@ def load_docs_demo():
     except Exception:
         st.warning("No se encontró data/docs_demo.csv. Cargando ejemplos por defecto.")
         return pd.DataFrame({
-            "id": [1, 2],
+            "id": [1, 2, 3],
             "texto": [
-                "Nacimiento de Juan Pérez... Registro Civil Sección 3ª.",
-                "Matrimonio de Ana López y Luis García... Acta nº 6789."
+                "Nacimiento de Juan Pérez, 15/03/1995, Madrid. Registro Civil Sección 3ª, Tomo 122, Folio 45.",
+                "Matrimonio de Ana López y Luis García, 20/06/2010, Sevilla. Acta nº 6789.",
+                "Defunción de María Díaz, 02/11/1980, Valencia. Certificado emitido por el Encargado del Registro."
             ]
         })
 
@@ -136,6 +137,22 @@ def load_modelos_confianza():
 docs_df = load_docs_demo()
 modelos_df = load_modelos_confianza()
 
+# ---------------------------
+# Estado inicial S1 (clave del problema)
+# ---------------------------
+if "s1_pick" not in st.session_state:
+    st.session_state.s1_pick = int(docs_df["id"].iloc[0])
+
+def _load_selected_text_from_pick():
+    """Callback: al cambiar el ID seleccionado, actualiza el texto y 'altered'."""
+    pick = st.session_state["s1_pick"]
+    base_text = docs_df.loc[docs_df["id"] == pick, "texto"].values[0]
+    st.session_state["s1_text"] = base_text
+    st.session_state["s1_altered"] = base_text  # resetea el alterado
+
+# Inicializar s1_text y s1_altered si no existen
+if "s1_text" not in st.session_state:
+    _load_selected_text_from_pick()
 if "ledger" not in st.session_state:
     st.session_state.ledger = []  # [{"texto","hash","timestamp","pseudo_firma"}]
 
@@ -198,28 +215,39 @@ with tabs[1]:
     colA, colB = st.columns([1, 1])
     with colA:
         st.markdown("#### 2.1 Carga un texto de ejemplo")
-        pick = st.selectbox(
+        id_list = docs_df["id"].tolist()
+        index_pick = id_list.index(st.session_state.s1_pick)
+        st.selectbox(
             "Selecciona un registro demo (puedes editarlo luego):",
-            options=docs_df["id"].tolist(),
-            format_func=lambda x: f"ID {x}"
+            options=id_list,
+            index=index_pick,
+            format_func=lambda x: f"ID {x}",
+            key="s1_pick",
+            on_change=_load_selected_text_from_pick,  # ← actualiza texto al cambiar
         )
-        base_text = docs_df.loc[docs_df["id"] == pick, "texto"].values[0]
-        text_input = st.text_area("Documento (editable):", base_text, height=120, key="s1_text")
+
+        # El text_area toma el valor **desde session_state**, no desde 'value' fijo
+        st.text_area(
+            "Documento (editable):",
+            key="s1_text",
+            height=120,
+        )
 
         if st.button("🔁 Alterar 1 carácter", key="alter_btn"):
-            st.session_state.s1_altered = alter_one_char(text_input)
-        s1_altered = st.session_state.get("s1_altered", text_input)
+            st.session_state.s1_altered = alter_one_char(st.session_state.s1_text)
+
+        s1_altered = st.session_state.get("s1_altered", st.session_state.s1_text)
 
     with colB:
         st.markdown("#### 2.2 Hash original vs alterado")
-        h_original = sha256_hex(text_input)
+        h_original = sha256_hex(st.session_state.s1_text)
         h_alterado = sha256_hex(s1_altered)
 
-        c1, c2 = st.columns(2)
-        with c1:
+        c1_, c2_ = st.columns(2)
+        with c1_:
             st.caption("Hash original")
             st.code(h_original)
-        with c2:
+        with c2_:
             st.caption("Hash alterado")
             st.code(h_alterado)
 
@@ -230,7 +258,7 @@ with tabs[1]:
 
     st.markdown("#### 2.3 Cadena simulada de 3 asientos")
     st.write("Cada asiento referencia el hash del anterior (prev_hash). Si alteras el primero, **rompes la cadena**.")
-    block1 = {"idx": 1, "contenido": text_input, "hash": sha256_hex(text_input), "prev_hash": "-"}
+    block1 = {"idx": 1, "contenido": st.session_state.s1_text, "hash": sha256_hex(st.session_state.s1_text), "prev_hash": "-"}
     block2 = {"idx": 2, "contenido": "Asiento 2: actualización de domicilio.", "hash": "", "prev_hash": block1["hash"]}
     block2["hash"] = sha256_hex(block2["contenido"] + "|" + block2["prev_hash"])
     block3 = {"idx": 3, "contenido": "Asiento 3: rectificación ortográfica.", "hash": "", "prev_hash": block2["hash"]}
@@ -254,13 +282,12 @@ with tabs[1]:
                 f.write("# Entrega S1 — Hash & Cadena de custodia\n\n")
                 f.write(f"**Fecha:** {ts}\n\n")
                 f.write("## Texto base\n\n")
-                f.write(text_input + "\n\n")
+                f.write(st.session_state.s1_text + "\n\n")
                 f.write(f"**Hash base:** `{h_original}`\n\n")
                 f.write("## Explicación (máx. 5 líneas)\n\n")
                 f.write((s1_entrega or "").strip() + "\n")
             st.success(f"Entrega guardada en {fname}")
 
-            # Descarga inmediata tras guardar
             with open(fname, "r", encoding="utf-8") as fh:
                 st.download_button(
                     "⬇️ Descargar ahora (S1)",
@@ -397,7 +424,6 @@ with tabs[4]:
 with tabs[5]:
     st.header("Entregables (Semana 1) y rúbrica")
 
-    # ——— Mensaje de explicación claro en la última página ———
     st.info(
         "ℹ️ **Dónde se guardan y cómo bajarlas**\n\n"
         "Cuando pulsas **Guardar entrega**, el archivo se crea en el **servidor** dentro de `./entregas`. "
@@ -428,7 +454,7 @@ with tabs[5]:
 
     st.markdown("---")
 
-    # === Listado y descarga de entregas guardadas ===
+    # === Entregas guardadas ===
     st.markdown("#### Entregas guardadas (en el servidor)")
     md_files = _list_md_files("entregas")
     if md_files:
